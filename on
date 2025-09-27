@@ -1,0 +1,3 @@
+  main         [m c22dd28 [[34morigin/main[m] fix bugs
+* [32msonarcloud   [m ec4cf77 [[34morigin/sonarcloud[m] chore(backend): bump phpunit^9.6 & phpcs^3.9; sync lock
+  update-readme[m 7e9293f fix rates

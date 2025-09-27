@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 Gondwana API Test Suite</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 40px; 
+            background: linear-gradient(135deg, #2c5530 0%, #5d8a3a 50%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #2c5530; text-align: center; }
+        button { 
+            padding: 12px 24px; 
+            margin: 10px 5px; 
+            background: linear-gradient(45deg, #2c5530, #5d8a3a); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        pre { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 8px; 
+            overflow: auto; 
+            margin: 10px 0;
+            border-left: 4px solid #2c5530;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #f8fffe;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-pending { background: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Gondwana Collection API Test Suite</h1>
+        <p><strong>Purpose:</strong> Debug API connectivity and JSON parsing issues</p>
+        
+        <div class="test-section">
+            <h3>🎯 Quick Tests</h3>
+            <button onclick="testAll()">🚀 Run All Tests</button>
+            <button onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📡 Individual Tests</h3>
+            <button onclick="testGet()">
+                <span id="status-get" class="status-indicator status-pending"></span>
+                GET /api
+            </button>
+            <button onclick="testDebug()">
+                <span id="status-debug" class="status-indicator status-pending"></span>
+                POST /debug.php
+            </button>
+            <button onclick="testApiTest()">
+                <span id="status-test" class="status-indicator status-pending"></span>
+                POST /api/test
+            </button>
+            <button onclick="testRates()">
+                <span id="status-rates" class="status-indicator status-pending"></span>
+                POST /api/rates
+            </button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const resultsDiv = document.getElementById('results');
+        
+        function updateStatus(testName, success) {
+            const indicator = document.getElementById(`status-${testName}`);
+            if (indicator) {
+                indicator.className = `status-indicator ${success ? 'status-success' : 'status-error'}`;
+            }
+        }
+        
+        function showResult(title, data, isError = false) {
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h4>${title}</h4>
+                <pre class="${isError ? 'error' : 'success'}">${JSON.stringify(data, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(div);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+            // Reset all status indicators
+            document.querySelectorAll('.status-indicator').forEach(el => {
+                el.className = 'status-indicator status-pending';
+            });
+        }
+        
+        async function testGet() {
+            try {
+                console.log('🔍 Testing GET /api...');
+                const response = await fetch(`${API_BASE}/api`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                showResult('✅ GET /api', { 
+                    status: response.status, 
+                    headers: Object.fromEntries(response.headers),
+                    data 
+                });
+                updateStatus('get', true);
+                return true;
+            } catch (error) {
+                console.error('GET error:', error);
+                showResult('❌ GET /api ERROR', { message: error.message, stack: error.stack }, true);
+                updateStatus('get', false);
+                return false;
+            }
+        }
+        
+        async function testDebug() {
+            try {
+                console.log('🔍 Testing POST /debug.php...');
+                const payload = { 
+                    test: 'debug data', 
+                    timestamp: new Date().toISOString(),
+                    number: 123 
+                };
+                console.log('Sending to debug:', payload);
+                
+                const response = await fetch(`${API_BASE}/debug.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                showResult('✅ POST /debug.php', { 
+                    status: response.status, 
+                    sent: payload, 
+                    received: data 
+                });
+                updateStatus('debug', true);
+                return true;
+            } catch (error) {
+                console.error('Debug error:', error);
+                showResult('❌ POST /debug.php ERROR', { message: error.message }, true);
+                updateStatus('debug', false);
+                return false;
+            }
+        }
+        
+        async function testApiTest() {
+            try {
+                console.log('🔍 Testing POST /api/test...');
+                const payload = { 
+                    test: 'api test data', 
+                    timestamp: new Date().toISOString()
+                };
+                
+                const response = await fetch(`${API_BASE}/api/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                showResult('✅ POST /api/test', { 
+                    status: response.status, 
+                    sent: payload, 
+                    received: data 
+                });
+                updateStatus('test', true);
+                return true;
+            } catch (error) {
+                console.error('API test error:', error);
+                showResult('❌ POST /api/test ERROR', { message: error.message }, true);
+                updateStatus('test', false);
+                return false;
+            }
+        }
+        
+        async function testRates() {
+            try {
+                console.log('🔍 Testing POST /api/rates...');
+                const payload = {
+                    "Unit Name": "Standard Unit",
+                    "Arrival": "01/02/2024",
+                    "Departure": "03/02/2024",
+                    "Occupants": 2,
+                    "Ages": [25, 30]
+                };
+                
+                const response = await fetch(`${API_BASE}/api/rates`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                showResult('✅ POST /api/rates', { 
+                    status: response.status, 
+                    sent: payload, 
+                    received: data 
+                });
+                updateStatus('rates', response.status < 400);
+                return response.status < 400;
+            } catch (error) {
+                console.error('Rates error:', error);
+                showResult('❌ POST /api/rates ERROR', { message: error.message }, true);
+                updateStatus('rates', false);
+                return false;
+            }
+        }
+        
+        async function testAll() {
+            clearResults();
+            showResult('🚀 Starting Test Suite', { 
+                timestamp: new Date().toISOString(),
+                baseUrl: API_BASE 
+            });
+            
+            // Run tests sequentially with delays
+            await testGet();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testDebug();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testApiTest();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testRates();
+            
+            showResult('🏁 Test Suite Completed', { 
+                completedAt: new Date().toISOString(),
+                note: 'Check browser console for detailed logs'
+            });
+        }
+        
+        // Auto-run basic test on load
+        setTimeout(() => {
+            testGet();
+        }, 1000);
+    </script>
+</body>
+</html>

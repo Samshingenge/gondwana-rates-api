@@ -1,330 +1,257 @@
-// --- app.js ---
-const API_BASE_URL = 'http://localhost:8000/api';
-
-// DOM helpers
-const el = (s, r = document) => r.querySelector(s);
-const els = (s, r = document) => Array.from(r.querySelectorAll(s));
-
-// Messages
-function showMessage(message, type = 'info') {
-  const box = el('#message');
-  if (!box) return;
-  box.innerHTML = `<div class="${type}">${message}</div>`;
-  setTimeout(() => (box.innerHTML = ''), 8000);
-}
-
-// Date helpers
-function toDDMMYYYY(iso /* yyyy-mm-dd */) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return '';
-  return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-}
-
-function openPicker(id) {
-  const input = document.getElementById(id);
-  if (!input) return;
-  if (typeof input.showPicker === 'function') input.showPicker();
-  else input.click();
-}
-
-function setMinDepartureFromArrival() {
-  const aISO = document.getElementById('arrivalISO');
-  const dISO = document.getElementById('departureISO');
-  if (!aISO || !dISO || !aISO.value) return;
-  const base = new Date(aISO.value);
-  if (Number.isNaN(base.getTime())) return;
-  const next = new Date(base.getTime() + 24 * 60 * 60 * 1000);
-  const minIso = next.toISOString().slice(0, 10);
-  dISO.min = minIso;
-  if (dISO.value && dISO.value < minIso) {
-    dISO.value = minIso;
-    el('#departureDisplay').value = toDDMMYYYY(minIso);
-  }
-}
-
-// Ages UI
-function ageRow(defaultValue = '') {
-  const row = document.createElement('div');
-  row.className = 'age-row';
-  row.innerHTML = `
-    <input type="number" class="age-input" placeholder="Age" min="0" max="120" value="${defaultValue}" style="width:90px;">
-    <button type="button" class="remove-age-btn" title="Remove age">×</button>
-  `;
-  return row;
-}
-
-function syncAgesToOccupants() {
-  const occ = parseInt(el('#occupants').value || '0', 10);
-  const container = el('#agesContainer');
-  const rows = els('.age-row', container);
-  const diff = occ - rows.length;
-  if (diff > 0) for (let i = 0; i < diff; i++) container.appendChild(ageRow());
-  if (diff < 0) for (let i = 0; i < -diff; i++) container.lastElementChild?.remove();
-}
-
-function collectAges() {
-  return els('.age-input').map(x => {
-    const n = parseInt(x.value || 'NaN', 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  }).filter(n => n !== null);
-}
-
-// Results helpers
-function formatCurrency(amount, currency = 'NAD') {
-  const val = (typeof amount === 'number' && isFinite(amount)) ? amount : 0;
-  return new Intl.NumberFormat('en-NA', { style: 'currency', currency }).format(val);
-}
-
-function parseDDMMYYYY(s) {
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s || '');
-  if (!m) return null;
-  const d = parseInt(m[1], 10);
-  const mo = parseInt(m[2], 10) - 1;
-  const y = parseInt(m[3], 10);
-  const dt = new Date(y, mo, d);
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo || dt.getDate() !== d) return null;
-  return dt;
-}
-
-function diffNights(arrivalStr, departureStr) {
-  const a = parseDDMMYYYY(arrivalStr);
-  const d = parseDDMMYYYY(departureStr);
-  if (!a || !d) return 1;
-  const ms = d - a;
-  const nights = Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
-  return nights;
-}
-
-// Strict renderer (only green when availability=true AND rate>0)
-function displayResults(data) {
-  const container = document.getElementById('resultsContainer');
-
-  if (!Array.isArray(data) || data.length === 0) {
-    container.innerHTML = `<div class="error">No rates available for the selected criteria.</div>`;
-    return;
-  }
-
-  const cards = data.map((r) => {
-    const unit = r.unit_name || 'Unit';
-    const currency = r.currency || 'NAD';
-
-    const arrival = r?.date_range?.arrival || '';
-    const departure = r?.date_range?.departure || '';
-    const nights = diffNights(arrival, departure);
-
-    const total = (typeof r.rate === 'number') ? r.rate : null;
-
-    // STRICT availability: must be true AND have a positive rate
-    const available = !!r.availability && total !== null && total > 0;
-    const perNight = (available && nights) ? (total / nights) : null;
-
-    const badgeClass = available ? 'available' : 'unavailable';
-    const badgeText = available ? 'Available' : 'Not Available';
-
-    const totalLine = available
-      ? `${formatCurrency(total, currency)} <span class="rate-sub">total</span>`
-      : `<span class="muted">Rate not available</span>`;
-
-    const perNightLine = (available && perNight && perNight > 0)
-      ? `${formatCurrency(perNight, currency)} <span class="rate-sub">per night × ${nights}</span>`
-      : `<span class="muted">–</span>`;
-
-    return `
-      <div class="rate-card">
-        <div class="rate-card-head">
-          <h3>${unit}</h3>
-          <span class="availability ${badgeClass}">${badgeText}</span>
-        </div>
-
-        <div class="rate-price">${totalLine}</div>
-        <div class="rate-price secondary">${perNightLine}</div>
-
-        <div class="rate-details">
-          <p><strong>Dates:</strong> ${arrival} – ${departure}</p>
-          <p><strong>Nights:</strong> ${nights}</p>
-        </div>
-
-        ${(!available)
-          ? `<div class="hint">No priced availability for the selected inputs. Try other dates/occupants or unit type.</div>`
-          : ``}
-      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <h3 style="margin-bottom: 16px; color: #2c5530;">Available Rates</h3>
-    <div class="results-grid">${cards}</div>
-  `;
-}
-
-// Init
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM loaded, initializing app...');
+  const API_BASE = 'http://localhost:8000/api';
 
-  // Hook calendar open buttons + clicking display fields
-  document.querySelectorAll('[data-open]').forEach(btn => {
-    btn.addEventListener('click', () => openPicker(btn.getAttribute('data-open')));
-  });
-  el('#arrivalDisplay')?.addEventListener('click', () => openPicker('arrivalISO'));
-  el('#departureDisplay')?.addEventListener('click', () => openPicker('departureISO'));
+  // Elements
+  const form = document.getElementById('rateForm');
+  const messageDiv = document.getElementById('message');
+  const resultsContainer = document.getElementById('resultsContainer');
+  const testBtn = document.getElementById('testBtn');
 
-  // Mirror ISO -> dd/mm/yyyy on change
-  const arrivalISO = el('#arrivalISO');
-  const departureISO = el('#departureISO');
+  const unitNameEl = document.getElementById('unitName');
+  const occupantsEl = document.getElementById('occupants');
 
-  // Set defaults if empty: today/tomorrow
-  const today = new Date();
-  const tomorrow = new Date(today.getTime() + 24*60*60*1000);
-  const toIso = d => d.toISOString().slice(0,10);
-  if (!arrivalISO.value) {
-    arrivalISO.value = toIso(today);
-    el('#arrivalDisplay').value = toDDMMYYYY(arrivalISO.value);
+  // Date inputs
+  const arrivalISO = document.getElementById('arrivalISO');
+  const arrivalDisplay = document.getElementById('arrivalDisplay');
+  const departureISO = document.getElementById('departureISO');
+  const departureDisplay = document.getElementById('departureDisplay');
+
+  // Ages
+  const agesContainer = document.getElementById('agesContainer');
+  const btnAddAge = document.querySelector('[data-add-age]');
+  const btnClearAges = document.querySelector('[data-clear-ages]');
+  const btnIncOcc = document.querySelector('[data-inc-occupant]');
+  const btnDecOcc = document.querySelector('[data-dec-occupant]');
+
+  // Helpers
+  function showMessage(msg, type = 'success') {
+    messageDiv.innerHTML = `<div class="${type}">${msg}</div>`;
   }
-  if (!departureISO.value) {
-    departureISO.value = toIso(tomorrow);
-    el('#departureDisplay').value = toDDMMYYYY(departureISO.value);
+  function clearMessage() { messageDiv.innerHTML = ''; }
+
+  function formatDateToDisplay(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
   }
-  setMinDepartureFromArrival();
 
-  arrivalISO?.addEventListener('change', () => {
-    el('#arrivalDisplay').value = toDDMMYYYY(arrivalISO.value);
-    setMinDepartureFromArrival();
-  });
-  departureISO?.addEventListener('change', () => {
-    el('#departureDisplay').value = toDDMMYYYY(departureISO.value);
-  });
+  function parseDmy(dmy) {
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dmy || '')) return null;
+    const [d, m, y] = dmy.split('/').map((s) => parseInt(s, 10));
+    const date = new Date(y, m - 1, d);
+    if (date.getFullYear() !== y || date.getMonth() !== (m - 1) || date.getDate() !== d) return null;
+    return date;
+  }
 
-  // Seed ages from occupants
-  syncAgesToOccupants();
+  function computeNights(arrivalDmy, departureDmy) {
+    const a = parseDmy(arrivalDmy);
+    const d = parseDmy(departureDmy);
+    if (!a || !d) return '–';
+    const ms = d - a;
+    return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
+  }
 
-  // Occupant controls
-  el('[data-inc-occupant]')?.addEventListener('click', () => {
-    const inp = el('#occupants');
-    inp.value = String((parseInt(inp.value || '0', 10) || 0) + 1);
-    syncAgesToOccupants();
-  });
-  el('[data-dec-occupant]')?.addEventListener('click', () => {
-    const inp = el('#occupants');
-    const v = Math.max(1, (parseInt(inp.value || '1', 10) || 1) - 1);
-    inp.value = String(v);
-    syncAgesToOccupants();
-  });
-  el('#occupants')?.addEventListener('input', syncAgesToOccupants);
+  function getAgesArray() {
+    return Array.from(agesContainer.querySelectorAll('.age-input'))
+      .map((el) => parseInt(el.value, 10))
+      .filter((n) => Number.isFinite(n) && n >= 0 && n <= 150);
+  }
 
-  // Add/Clear ages
-  const agesContainer = el('#agesContainer');
-  el('[data-add-age]')?.addEventListener('click', () => {
-    agesContainer.appendChild(ageRow());
-    el('#occupants').value = String(els('.age-row', agesContainer).length);
-  });
-  el('[data-clear-ages]')?.addEventListener('click', () => {
-    agesContainer.innerHTML = '';
-    el('#occupants').value = '1';
-    syncAgesToOccupants();
-  });
-  // Remove age via delegation
-  agesContainer.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-age-btn')) {
-      e.target.parentElement.remove();
-      el('#occupants').value = String(els('.age-row', agesContainer).length || 1);
-      syncAgesToOccupants();
+  function makeAgeChip(val) {
+    const wrap = document.createElement('div');
+    wrap.className = 'age-row';
+    wrap.innerHTML = `
+      <input type="number" min="0" max="150" value="${val}" class="age-input" style="width:90px;padding:8px;border:2px solid #d4edda;border-radius:8px;">
+      <button type="button" class="remove-age-btn">×</button>
+    `;
+    wrap.querySelector('.remove-age-btn').addEventListener('click', () => {
+      wrap.remove();
+      const count = agesContainer.querySelectorAll('.age-input').length;
+      occupantsEl.value = Math.max(1, count);
+    });
+    return wrap;
+  }
+
+  function syncAgesToOccupants() {
+    const occ = Math.max(1, parseInt(occupantsEl.value || '1', 10));
+    const current = agesContainer.querySelectorAll('.age-input').length;
+
+    if (current < occ) {
+      for (let i = 0; i < occ - current; i++) {
+        agesContainer.appendChild(makeAgeChip(18));
+      }
+    } else if (current > occ) {
+      const chips = Array.from(agesContainer.querySelectorAll('.age-row'));
+      for (let i = 0; i < current - occ; i++) {
+        const last = chips.pop();
+        last && last.remove();
+      }
     }
+  }
+
+  function buildPayload() {
+    return {
+      'Unit Name': unitNameEl.value,
+      'Arrival': arrivalDisplay.value.trim(),
+      'Departure': departureDisplay.value.trim(),
+      'Occupants': parseInt(occupantsEl.value, 10),
+      'Ages': getAgesArray()
+    };
+  }
+
+  function validatePayload(p) {
+    const errs = [];
+    if (!p['Unit Name']) errs.push('Unit Name is required');
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(p['Arrival'])) errs.push('Arrival must be dd/mm/yyyy');
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(p['Departure'])) errs.push('Departure must be dd/mm/yyyy');
+    if (!(p['Occupants'] > 0)) errs.push('Occupants must be greater than 0');
+    if (!Array.isArray(p['Ages']) || p['Ages'].length !== p['Occupants']) {
+      errs.push('Ages must equal number of occupants');
+    }
+    return errs;
+  }
+
+  // Date syncing
+  arrivalISO.addEventListener('change', () => { arrivalDisplay.value = formatDateToDisplay(arrivalISO.value); });
+  departureISO.addEventListener('change', () => { departureDisplay.value = formatDateToDisplay(departureISO.value); });
+  document.querySelectorAll('.date-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.open);
+      if (!target) return;
+      if (typeof target.showPicker === 'function') target.showPicker(); else target.focus();
+    });
   });
 
-  // Submit
-  const form = el('#rateForm');
-  const submitBtn = el('#submitBtn');
-  const results = el('#resultsContainer');
+  // Occupants controls
+  btnIncOcc?.addEventListener('click', () => { occupantsEl.value = Math.max(1, parseInt(occupantsEl.value || '1', 10) + 1); syncAgesToOccupants(); });
+  btnDecOcc?.addEventListener('click', () => { occupantsEl.value = Math.max(1, parseInt(occupantsEl.value || '1', 10) - 1); syncAgesToOccupants(); });
+  occupantsEl.addEventListener('input', syncAgesToOccupants);
 
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  // Ages controls
+  btnAddAge?.addEventListener('click', () => {
+    agesContainer.appendChild(makeAgeChip(18));
+    const count = agesContainer.querySelectorAll('.age-input').length;
+    occupantsEl.value = Math.max(1, count);
+  });
+  btnClearAges?.addEventListener('click', () => {
+    agesContainer.innerHTML = '';
+    occupantsEl.value = 1;
+    syncAgesToOccupants();
+  });
 
-    const unitName = (el('#unitName')?.value || '').trim();
-    const arrivalIso = arrivalISO?.value || '';
-    const departureIso = departureISO?.value || '';
-    const occupants = parseInt(el('#occupants')?.value || '0', 10);
-    const ages = collectAges();
+  // Results
+  function renderResults(data, payload) {
+    resultsContainer.innerHTML = '';
 
-    if (!unitName || !arrivalIso || !departureIso || !occupants || ages.length !== occupants) {
-      showMessage(`Please fill all fields. Ages (${ages.length}) must equal occupants (${occupants}).`, 'error');
+    if (!data || !Array.isArray(data)) {
+      resultsContainer.innerHTML = '<div class="error">No valid results returned.</div>';
       return;
     }
 
-    const payload = {
-      "Unit Name": unitName,
-      "Arrival": toDDMMYYYY(arrivalIso),
-      "Departure": toDDMMYYYY(departureIso),
-      "Occupants": occupants,
-      "Ages": ages
-    };
+    data.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'rate-card';
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Searching...';
-    results.innerHTML = `
-      <div class="loading">
-        <div class="spinner"></div>
-        <p>Searching for available rates...</p>
-      </div>`;
+      const unitTitle = item?.unit_name ?? payload?.['Unit Name'] ?? 'Unit';
+      const dr = item?.date_range || {};
+      const arrival = dr.arrival ?? (payload?.['Arrival'] ?? '–');
+      const departure = dr.departure ?? (payload?.['Departure'] ?? '–');
+      const nights = (typeof dr.nights !== 'undefined' && dr.nights !== null && dr.nights !== '')
+        ? dr.nights : computeNights(arrival, departure);
+      const occupants = item?.occupants ?? payload?.Occupants ?? '';
 
-    try {
-      const resp = await fetch(`${API_BASE_URL}/rates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const text = await resp.text();
-      const json = JSON.parse(text);
+      const rateNum = typeof item?.rate === 'number' ? item.rate : NaN;
+      const availability = item?.availability;
 
-      if (!resp.ok || !json.success) {
-        throw new Error(json.error?.message || json.error || `HTTP ${resp.status}`);
+      const isPriced = Number.isFinite(rateNum) && rateNum > 0 && availability !== false;
+
+      const parts = [];
+      parts.push(`<h3>${unitTitle}</h3>`);
+
+      if (isPriced) {
+        // AVAILABLE badge + price
+        parts.push(`<div class="availability available">AVAILABLE</div>`);
+        const price = Number(rateNum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const currency = item?.currency ?? 'NAD';
+        parts.push(`<div class="rate-price">${price} <span class="rate-sub">${currency}</span></div>`);
+      } else {
+        // UNAVAILABLE badge + reasons
+        parts.push(`<div class="availability unavailable">UNAVAILABLE</div>`);
+        parts.push(`<div>Rate not available</div>`);
       }
 
-      // ✅ Strict renderer only
-      displayResults(json.data);
-      showMessage('Rates loaded successfully!', 'success');
+      parts.push(`<div class="muted"><strong>Dates:</strong> ${arrival} – ${departure}</div>`);
+      parts.push(`<div class="muted"><strong>Occupants:</strong> ${occupants} ,<strong>Nights:</strong> ${nights}</div>`);
+
+      if (isPriced) {
+        // CTA line under priced card
+        parts.push(`<div class="muted">Book now for your advanture</div>`);
+      } else {
+        // Guidance under unpriced card
+        parts.push(`<div class="muted">No priced availability for the selected inputs. Try other dates/occupants or unit type.</div>`);
+      }
+
+      card.innerHTML = parts.join('\n');
+      resultsContainer.appendChild(card);
+    });
+  }
+
+  // Submit
+  async function submitForm(e) {
+    e.preventDefault();
+    clearMessage();
+
+    const payload = buildPayload();
+    const errs = validatePayload(payload);
+    if (errs.length) { showMessage(errs[0], 'error'); return; }
+
+    try {
+      const res = await fetch(`${API_BASE}/rates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        showMessage('Rates fetched successfully!', 'success');
+        renderResults(json.data, payload);
+      } else {
+        showMessage(json.error?.message ?? 'Unknown error', 'error');
+      }
     } catch (err) {
       console.error(err);
-      showMessage(`Error: ${err.message}`, 'error');
-      results.innerHTML = '';
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Search Rates';
+      showMessage(err.message, 'error');
     }
-  });
+  }
 
-  // Test JSON button
-  el('#testBtn')?.addEventListener('click', async () => {
-    const testPayload = {
-      "Unit Name": "Standard Unit",
-      "Arrival": "25/01/2024",
-      "Departure": "28/01/2024",
-      "Occupants": 2,
-      "Ages": [25, 30]
-    };
+  // Test
+  async function testEndpoint() {
+    clearMessage();
     try {
-      const r = await fetch(`${API_BASE_URL}/test`, {
+      const res = await fetch(`${API_BASE}/test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(testPayload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ping: 'ok' })
       });
-      const data = await r.json();
-      console.log('Test endpoint:', data);
-      showMessage('Test completed — check console for details', 'success');
-    } catch (e) {
-      console.error(e);
-      showMessage(`Test failed: ${e.message}`, 'error');
+      const json = await res.json();
+      if (json.success) {
+        showMessage('Test endpoint success', 'success');
+        resultsContainer.innerHTML = `<pre>${JSON.stringify(json, null, 2)}</pre>`;
+      } else {
+        showMessage('Test endpoint failed', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showMessage(err.message, 'error');
     }
-  });
+  }
 
-  // Quick connection check
-  (async () => {
-    try {
-      const r = await fetch(`${API_BASE_URL}`, { headers: { 'Accept': 'application/json' } });
-      if (!r.ok) throw new Error(`API ${r.status}`);
-      showMessage('Connected to API successfully!', 'success');
-    } catch {
-      showMessage('API connection failed. Ensure backend is on localhost:8000', 'error');
-    }
-  })();
+  form.addEventListener('submit', submitForm);
+  testBtn.addEventListener('click', testEndpoint);
+
+  // Init defaults
+  agesContainer.innerHTML = '';
+  agesContainer.appendChild(makeAgeChip(30));
+  agesContainer.appendChild(makeAgeChip(28));
+  syncAgesToOccupants();
 });

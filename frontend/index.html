@@ -64,6 +64,16 @@
       background:#fff; border-radius:15px; padding:20px; box-shadow:var(--shadow); border-left:5px solid var(--secondary);
     }
     .rate-card h3{ color:var(--primary); margin-bottom:8px; }
+    /* Ensure muted text and strong labels read well */
+.muted {
+  font-size: 0.9rem;
+  color: #555;
+}
+.muted strong {
+  color: #333;
+}
+
+
 
     /* availability/price styles */
     .rate-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
@@ -86,9 +96,12 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>Gondwana Collection</h1>
-      <p>Discover accommodation rates & availability</p>
-    </div>
+  <div class="logo-title">
+    <img src="./assets/21.webp" alt="Gondwana Logo" class="logo" />
+    <h1>Gondwana Collection</h1>
+  </div>
+  <p>Discover accommodation rates &amp; availability</p>
+</div>
 
     <div class="booking-form">
       <h2 style="margin-bottom: 10px; color:#2c5530;">Search Accommodation</h2>

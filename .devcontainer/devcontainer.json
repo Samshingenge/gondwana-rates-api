@@ -1,23 +1,26 @@
 {
-    "name": "Job Application Assignment",
-    "dockerFile": "Dockerfile",
-    "forwardPorts": [8000, 3000, 5500],
-    "postCreateCommand": "cd backend && composer install",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-vscode.vscode-json",
-                "bmewburn.vscode-intelephense-client",
-                "bradlc.vscode-tailwindcss",
-                "ms-vscode.live-server",
-                "esbenp.prettier-vscode"
-            ],
-            "settings": {
-                "php.validate.executablePath": "/usr/local/bin/php",
-                "php.suggest.basic": false,
-                "intelephense.files.maxSize": 1000000
-            }
-        }
-    },
-    "remoteUser": "vscode"
+  "name": "Gondwana Rates API",
+  "dockerFile": "Dockerfile",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "forwardPorts": [8000, 5500],
+  "portsAttributes": {
+    "8000": { "label": "PHP API", "onAutoForward": "openBrowser" },
+    "5500": { "label": "Frontend", "onAutoForward": "openBrowser" }
+  },
+  "postCreateCommand": "sudo install -m 0755 /usr/local/bin/composer /usr/bin/composer || true && cd backend && composer install",
+  "postStartCommand": "nohup bash -lc 'php -S 0.0.0.0:8000 -t backend/public' >/tmp/php.log 2>&1 &",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-json",
+        "bmewburn.vscode-intelephense-client",
+        "esbenp.prettier-vscode"
+      ],
+      "settings": {
+        "php.validate.executablePath": "/usr/bin/php",
+        "intelephense.files.maxSize": 1000000
+      }
+    }
+  },
+  "remoteUser": "vscode"
 }

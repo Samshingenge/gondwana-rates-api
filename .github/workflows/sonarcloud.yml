@@ -1,9 +1,14 @@
 name: SonarCloud
+
 on:
   push:
-    branches: ["main", "submission/**", "feature/**"]
+    branches:
+      - "main"            # baseline/default branch analysis
+      - "submission/**"   # analyze submission branches
+      - "feature/**"      # analyze feature branches
   pull_request:
-    branches: ["**"]
+    branches:
+      - "**"              # analyze PRs into any branch
   workflow_dispatch:
 
 permissions:
@@ -13,40 +18,66 @@ permissions:
 jobs:
   build-and-analyze:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
 
-      - uses: actions/cache@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # required for blame/PR decoration
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - uses: shivammathur/setup-php@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.2"
+          php-version: '8.2'
           coverage: xdebug
           tools: composer
 
-      - name: Install backend deps + tests
+      - name: Cache Composer (backend)
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-
+
+      - name: Install deps + run tests (backend)
         working-directory: backend
         run: |
           composer install --no-interaction --prefer-dist --no-progress
           mkdir -p build/logs
-          if [ -x ./vendor/bin/phpunit ]; then ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true; fi
+          if [ -x ./vendor/bin/phpunit ]; then ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true; else echo "PHPUnit not installed"; fi
 
-      - uses: actions/setup-java@v4
-        with: { distribution: "temurin", java-version: "17" }
+      - name: Setup JDK 17 (required by Sonar)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
+      # --- SonarCloud scan ---
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2.1.1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_SCANNER_OPTS: "-X" # enable debug logging once
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # provided by GitHub
+          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}    # add in repo secrets
+          # SONAR_SCANNER_OPTS: "-X"                  # uncomment for verbose debug
         with:
-         args: >
-         -Dsonar.organization=samshingenge
-         -Dsonar.projectKey=Samshingenge_gondwana-rates-api
-  # make sure this secret exists
+          args: >
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=samshingenge
+            -Dsonar.projectKey=Samshingenge_gondwana-rates-api
+            -Dsonar.php.coverage.reportPaths=backend/build/logs/clover.xml
+            -Dsonar.scanner.dumpToFile=sonar-props.txt
+
+      # Upload resolved properties for troubleshooting (kept even on success)
+      - name: Upload scanner properties
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-props
+          path: sonar-props.txt

@@ -1,82 +1,46 @@
 name: SonarCloud
-
 on:
+  push:
+    branches: [ "main", "submission/**", "feature/**" ]
   pull_request:
-    branches: [ "main" ]
-  # optional (uncomment if you also want main pushes analyzed)
-  # push:
-  #   branches: [ "main" ]
+    branches: [ "**" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  sonarcloud:
-    name: SonarCloud Scan
+  build-and-analyze:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # required for proper blame/PR analysis
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      # PHP for backend + xdebug for coverage
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           coverage: xdebug
           tools: composer
 
-      # (Optional) Cache composer vendor to speed up CI
-      - name: Cache Composer deps
-        uses: actions/cache@v4
-        with:
-          path: backend/vendor
-          key: ${{ runner.os }}-php-${{ hashFiles('backend/composer.lock') }}
-          restore-keys: ${{ runner.os }}-php-
-
-      - name: Install PHP dependencies (backend)
+      - name: Install backend deps + tests
         working-directory: backend
         run: |
-          if [ -f composer.json ]; then
-            composer validate --no-interaction || true
-            composer install --no-interaction --prefer-dist --no-progress
-          else
-            echo "No composer.json in backend/"
-          fi
-
-      - name: Run PHPUnit with coverage (backend)
-        working-directory: backend
-        run: |
+          composer install --no-interaction --prefer-dist --no-progress
           mkdir -p build/logs
-          if [ -x ./vendor/bin/phpunit ]; then
-            ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true
-          else
-            echo "PHPUnit not installed; skipping tests."
-          fi
+          if [ -x ./vendor/bin/phpunit ]; then ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true; fi
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2.1.1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # auto-provided by GitHub Actions
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # add in repo secrets
-        with:
-          args: >
-            -Dsonar.projectKey=gondwana-rates-api
-            -Dsonar.organization=samshingenge
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}   # make sure this secret exists

@@ -191,9 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="range-summary__hint">Change any date to update the summary.</div>
       `;
     } else if (DATE_RE_DMY.test(a)) {
-      rangeSummary.textContent = `Arrival set to ${a}. Choose a valid departure date.`;
+      rangeSummary.textContent = `Arrival set to ${a}. Choose a valid departure date`;
     } else if (DATE_RE_DMY.test(d)) {
-      rangeSummary.textContent = `Departure set to ${d}. Choose a valid arrival date.`;
+      rangeSummary.textContent = `Departure set to ${d}. Choose a valid arrival date`;
     } else {
       rangeSummary.textContent = 'Choose arrival and departure dates to see the stay summary.';
     }
@@ -259,6 +259,50 @@ document.addEventListener('DOMContentLoaded', () => {
     return !over;
   }
 
+  // ===== Pricing model (frontend-calculated fallback) =====
+  // If backend returns 'total' or 'rate_total', we'll use that instead.
+  const PRICING = {
+    model: 'per_night_per_person', // 'per_night_per_person' | 'per_night' | 'flat'
+    childFactor: 0.5,   // each child pays 50% of adult
+    infantFactor: 0.0,  // infants free
+  };
+  function roundCurrency(n) {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+  function computeRowTotal(row, payload, item) {
+    // 1) Trust backend total if present
+    const backendTotal = Number(item?.total ?? item?.rate_total);
+    if (Number.isFinite(backendTotal) && backendTotal > 0) return backendTotal;
+
+    // 2) Fallback: compute client-side
+    const rate = Number(item?.rate);
+    if (!Number.isFinite(rate) || rate <= 0) return NaN;
+
+    const nights = Number(row.nights) || 1;
+    const adults = Number(payload?.Adults || 0);
+    const children = Number(payload?.Children || 0);
+    const infants = Number(payload?.Infants || 0);
+
+    let total;
+    switch (PRICING.model) {
+      case 'per_night_per_person': {
+        const eq = adults + (children * PRICING.childFactor) + (infants * PRICING.infantFactor);
+        total = rate * nights * eq;
+        break;
+      }
+      case 'per_night': {
+        total = rate * nights;
+        break;
+      }
+      case 'flat':
+      default: {
+        total = rate;
+        break;
+      }
+    }
+    return roundCurrency(total);
+  }
+
   // ---------- Payload & validation ----------
   function collectAges(container, min, max) {
     return Array.from(container.querySelectorAll('.age-input'))
@@ -279,9 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
       'Unit Name': unitNameEl.value,
       'Arrival': arrivalDisplay.value.trim(),
       'Departure': departureDisplay.value.trim(),
-      'Adults': Adults,
-      'Children': Children,
-      'Infants': Infants,
+      'Adults': Adults, 'adults': Adults,
+      'Children': Children, 'children': Children,
+      'Infants': Infants, 'infants': Infants,
       'Occupants': Adults + Children + Infants,
       'Ages': Ages
     };
@@ -351,7 +395,6 @@ document.addEventListener('DOMContentLoaded', () => {
   dateModal.addEventListener('click', (e) => { if (e.target === dateModal) closeDateFix(); });
   dateModalClose.addEventListener('click', closeDateFix);
   dateModalPick.addEventListener('click', () => {
-    // Prefer focusing arrival/departure currently being edited; fallback to arrival
     const target = document.activeElement === departureDisplay ? departureISO : arrivalISO;
     if (target && typeof target.showPicker === 'function') target.showPicker();
     closeDateFix();
@@ -512,27 +555,50 @@ document.addEventListener('DOMContentLoaded', () => {
       const dr = item?.date_range || {};
       const arrival = dr.arrival ?? (payload?.['Arrival'] ?? '–');
       const departure = dr.departure ?? (payload?.['Departure'] ?? '–');
-      const nights = (dr.nights ?? computeNights(arrival, departure));
-      const rateNum = (typeof item?.rate === 'number') ? item.rate : NaN;
+
+      // Nights must be numeric
+      let nights = Number(dr.nights);
+      if (!Number.isFinite(nights) || nights <= 0) {
+        const c = computeNights(arrival, departure);
+        nights = Number.isFinite(c) ? c : 1;
+      }
+
+      const rateNum = (typeof item?.rate === 'number') ? item.rate : Number(item?.rate);
       const backendUnavailable = item?.availability === false;
       const hasPrice = Number.isFinite(rateNum) && rateNum > 0;
       const availability = backendUnavailable ? false : hasPrice;
       const currency = item?.currency ?? 'NAD';
-      return { unit, arrival, departure, nights, availability, rate: rateNum, currency };
+
+      return { unit, arrival, departure, nights, availability, rate: rateNum, currency, _raw: item };
     });
   }
 
   function openModal(rows, payload) {
     modalTbody.innerHTML = '';
-    let total = 0, pricedCount = 0;
+    let grandTotal = 0;
+    let anyPriced = false;
     const currency = rows[0]?.currency || 'NAD';
 
     rows.forEach((r) => {
-      const hasPrice = Number.isFinite(r.rate) && r.rate > 0;
-      if (hasPrice) { total += r.rate; pricedCount++; }
-      const badgeHtml = r.availability && hasPrice
+      const hasBaseRate = Number.isFinite(r.rate) && r.rate > 0;
+      let rowTotal = NaN;
+
+      if (r.availability && hasBaseRate) {
+        rowTotal = computeRowTotal(r, payload, r._raw);
+        if (Number.isFinite(rowTotal) && rowTotal > 0) {
+          grandTotal += rowTotal;
+          anyPriced = true;
+        }
+      }
+
+      const badgeHtml = r.availability && hasBaseRate
         ? `<span class="badge ok">AVAILABLE</span>`
         : (r.availability ? `<span class="badge no">NO PRICED RATE</span>` : `<span class="badge no">UNAVAILABLE</span>`);
+
+      const calcTitle = `Calc: nights=${r.nights}, adults=${payload.Adults}, children=${payload.Children} (x${PRICING.childFactor}), infants=${payload.Infants} (x${PRICING.infantFactor})`;
+      const displayAmount = Number.isFinite(rowTotal) ? formatMoney(rowTotal, r.currency) : '—';
+      const baseRate = hasBaseRate ? formatMoney(r.rate, r.currency) : '—';
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${r.unit}</td>
@@ -540,13 +606,17 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${r.departure}</td>
         <td>${r.nights}</td>
         <td>${badgeHtml}</td>
-        <td style="text-align:right">${hasPrice ? formatMoney(r.rate, r.currency) : '—'}</td>
+        <td style="text-align:right" title="${calcTitle}">
+          ${displayAmount}
+          <div style="opacity:.75;font-size:.8em;">(base ${baseRate})</div>
+        </td>
       `;
       modalTbody.appendChild(tr);
     });
 
-    modalTotal.textContent = pricedCount > 0 ? formatMoney(total, currency) : '—';
-    const hasPricedAvailable = rows.some(r => r.availability && Number.isFinite(r.rate) && r.rate > 0);
+    modalTotal.textContent = anyPriced ? formatMoney(grandTotal, currency) : '—';
+
+    const hasPricedAvailable = anyPriced;
     canConfirm = hasPricedAvailable;
     modalConfirm.classList.toggle('danger', !canConfirm);
 

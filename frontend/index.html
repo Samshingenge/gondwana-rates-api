@@ -86,9 +86,7 @@
 
     .ages-container{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
     .age-row{ display:flex; align-items:center; gap:8px; }
-    .age-row input{
-      width:90px; padding:8px; border:2px solid #d4edda; border-radius:8px;
-    }
+    .age-row input{ width:90px; padding:8px; border:2px solid #d4edda; border-radius:8px; }
     .remove-age-btn{
       background:#dc3545; color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer;
     }
@@ -135,7 +133,6 @@
     }
     .cap-hint{ color:#666; font-size:12px; margin-left:8px; }
 
-    /* Small screens / high zoom */
     @media (max-width:640px){
       .modal__panel{ width:100vw; height:100dvh; max-height:none; border-radius:0; }
       .modal__header{ position:sticky; top:0; z-index:1; }
@@ -147,7 +144,6 @@
       .date-btn{ width:100%; }
     }
 
-    /* Print minimal */
     @media print{
       html,body{ background:#fff !important; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
       body > *:not(.modal){ display:none !important; }

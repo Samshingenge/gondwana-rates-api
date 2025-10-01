@@ -8,7 +8,7 @@
     "5500": { "label": "Frontend", "onAutoForward": "openBrowser" }
   },
   "postCreateCommand": "sudo install -m 0755 /usr/local/bin/composer /usr/bin/composer || true && cd backend && composer install",
-  "postStartCommand": "nohup bash -lc 'php -S 0.0.0.0:8000 -t backend/public' >/tmp/php.log 2>&1 &",
+  "postStartCommand": "nohup bash -lc 'php -S 0.0.0.0:8000 -t backend/public backend/public/router.php' >/tmp/php.log 2>&1 &",
   "customizations": {
     "vscode": {
       "extensions": [

@@ -1,9 +1,18 @@
 name: SonarCloud
 on:
-  push:
+  push: submission/gondwana-v1
     branches: [ "main", "submission/**", "feature/**" ]
   pull_request:
     branches: [ "**" ]
+
+    branches:
+      - "main"            # baseline/default branch analysis
+      - "submission/**"   # analyze submission branches
+      - "feature/**"      # analyze feature branches
+  pull_request:
+    branches:
+      - "**"              # analyze PRs into any branch
+ main
   workflow_dispatch:
 
 permissions:
@@ -14,8 +23,15 @@ jobs:
   build-and-analyze:
     runs-on: ubuntu-latest
     steps:
+        submission/gondwana-v1
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # required for blame/PR decoration
+        main
 
       - uses: actions/cache@v4
         with:
@@ -23,24 +39,72 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+       submission/gondwana-v1
       - uses: shivammathur/setup-php@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        main
         with:
           php-version: '8.2'
           coverage: xdebug
           tools: composer
 
+        submission/gondwana-v1
       - name: Install backend deps + tests
+
+      - name: Cache Composer (backend)
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-
+
+      - name: Install deps + run tests (backend)
+        main
         working-directory: backend
         run: |
           composer install --no-interaction --prefer-dist --no-progress
           mkdir -p build/logs
+         submission/gondwana-v1
           if [ -x ./vendor/bin/phpunit ]; then ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true; fi
 
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
 
+          if [ -x ./vendor/bin/phpunit ]; then ./vendor/bin/phpunit --coverage-clover build/logs/clover.xml || true; else echo "PHPUnit not installed"; fi
+
+      - name: Setup JDK 17 (required by Sonar)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+       main
+
+      # --- SonarCloud scan ---
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2.1.1
         env:
+       submission/gondwana-v1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}   # make sure this secret exists
+
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # provided by GitHub
+          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}    # add in repo secrets
+          # SONAR_SCANNER_OPTS: "-X"                  # uncomment for verbose debug
+        with:
+          args: >
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=samshingenge
+            -Dsonar.projectKey=Samshingenge_gondwana-rates-api
+            -Dsonar.php.coverage.reportPaths=backend/build/logs/clover.xml
+            -Dsonar.scanner.dumpToFile=sonar-props.txt
+
+      # Upload resolved properties for troubleshooting (kept even on success)
+      - name: Upload scanner properties
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-props
+          path: sonar-props.txt
+     main

@@ -2,6 +2,9 @@
 
 A PHP-based REST API with a simple frontend UI for querying **accommodation rates and availability** from the Gondwana Collection Namibia remote API.
 
+<img width="1648" height="1239" alt="Top" src="https://github.com/user-attachments/assets/d2a8d6e2-49b2-4de2-90f2-19e93bc91393" />
+
+
 ---
 
 ## 📌 Features

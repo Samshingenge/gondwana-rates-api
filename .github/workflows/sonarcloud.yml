@@ -1,54 +1,24 @@
-name: CI
-
+name: SonarCloud
 on:
   push:
+    branches: [ "main", "submission/**" ]
   pull_request:
-
+    types: [opened, synchronize, reopened]
+    branches: [ "main" ]
 jobs:
-  build-and-analyze:
+  sonar:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout (full history, required by Sonar)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Enable step debug logs
-        if: ${{ github.event_name != 'pull_request_target' }}
-        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-
-      # SonarScanner requires Java. Use 17 (recommended).
-      - name: Setup Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
-
-      # (If you run builds/tests for coverage)
-      # - name: Setup PHP
-      #   uses: shivammathur/setup-php@v2
-      #   with:
-      #     php-version: '8.2'
-
-      # - name: Install deps / run tests / generate coverage
-      #   run: |
-      #     composer install --no-interaction --prefer-dist
-      #     ./vendor/bin/phpunit --coverage-clover backend/coverage.xml
-
+          java-version: 17
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pass -X via env (debug) and enable verbose logs
-          SONAR_SCANNER_OPTS: "-X"
-        with:
-          args: >
-            -Dsonar.verbose=true
-            -Dsonar.projectKey=Samshingenge_gondwana-rates-api
-            -Dsonar.organization=samshingenge
-            -Dsonar.sources=backend,frontend
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.php.coverage.reportPaths=backend/coverage.xml
-            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.min.js,frontend/assets/**

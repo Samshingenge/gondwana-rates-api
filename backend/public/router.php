@@ -1,50 +1,46 @@
 <?php
-// Always send CORS (dev)
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowOrigin = $origin ?: '*';
+declare(strict_types=1);
 
-header("Access-Control-Allow-Origin: " . $allowOrigin);
-header('Vary: Origin');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Access-Control-Max-Age: 86400');
-// Only allow credentials when we have a concrete Origin (not '*')
-if ($origin) {
-    header('Access-Control-Allow-Credentials: true');
+// Serve existing static files under backend/public directly
+$uri  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$file = __DIR__ . $uri;
+if ($uri !== '/' && is_file($file)) {
+    return false; // let PHP built-in server serve it
 }
 
-header('X-Router: on'); // debug marker
-
-// Preflight short-circuit
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
-    http_response_code(204);
+// Route /api/* to API front controller (it handles CORS + JSON)
+if (strncmp($uri, '/api', 4) === 0) {
+    $apiEntry = __DIR__ . '/api/index.php';
+    if (is_file($apiEntry)) {
+        require $apiEntry;
+        exit;
+    }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'error' => ['message' => 'API entry not found', 'code' => 500]]);
     exit;
 }
 
-$uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-
-// Serve assets from backend/public directly when present
-$docFile = __DIR__ . $uri;
-if ($uri !== '/' && is_file($docFile)) {
-    return false; // allow PHP dev server to stream the file
-}
-
-// Attempt to serve the frontend bundle from ../frontend for same-origin SPA hosting
+// Serve the frontend from repo /frontend (same-origin, no CORS needed)
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $frontendDir = realpath(__DIR__ . '/../../frontend');
     if ($frontendDir !== false) {
         $requestedPath = $uri === '/' ? '/index.html' : $uri;
-        $candidate = realpath($frontendDir . $requestedPath);
+        $candidate     = realpath($frontendDir . $requestedPath);
 
-        if ($candidate && str_starts_with($candidate, $frontendDir) && is_file($candidate)) {
+        if ($candidate !== false
+            && strncmp($candidate, $frontendDir, strlen($frontendDir)) === 0
+            && is_file($candidate)) {
             serve_frontend_file($candidate);
             exit;
         }
     }
 }
 
-// Everything else → API front controller
-require __DIR__ . '/index.php';
+// Not found
+http_response_code(404);
+header('Content-Type: text/plain; charset=utf-8');
+echo "Not found";
 
 function serve_frontend_file(string $file): void
 {
@@ -64,12 +60,8 @@ function serve_frontend_file(string $file): void
         'woff' => 'font/woff',
         'woff2'=> 'font/woff2',
     ];
-
     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-    $contentType = $mimeMap[$ext] ?? 'application/octet-stream';
-
-    header('Content-Type: ' . $contentType);
+    header('Content-Type: ' . ($mimeMap[$ext] ?? 'application/octet-stream'));
     header('Cache-Control: public, max-age=60');
-
     readfile($file);
 }

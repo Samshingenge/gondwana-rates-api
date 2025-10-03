@@ -7,18 +7,15 @@ declare(strict_types=1);
  * - Client IP detection (proxy-aware)
  * - Simple request logging
  * - CORS headers (+ preflight helper)
- * - Optional: unit capacity helper & JSON response helper
+ * - Unit capacity helper & JSON response helper
  */
 
 function validateDateFormat(string $date, string $format = 'd/m/Y'): bool {
     if ($date === '') return false;
     $dt = DateTime::createFromFormat($format, $date);
     if (!$dt) return false;
-
     $errors = DateTime::getLastErrors();
-    if (!empty($errors['warning_count']) || !empty($errors['error_count'])) {
-        return false;
-    }
+    if (!empty($errors['warning_count']) || !empty($errors['error_count'])) return false;
     return $dt->format($format) === $date;
 }
 
@@ -32,18 +29,12 @@ function getClientIp(): string {
         'HTTP_FORWARDED',
         'REMOTE_ADDR',
     ];
-
     foreach ($headerKeys as $key) {
         if (!empty($_SERVER[$key])) {
-            $raw = $_SERVER[$key];
-            $parts = array_map('trim', explode(',', (string)$raw));
+            $parts = array_map('trim', explode(',', (string)$_SERVER[$key]));
             foreach ($parts as $ip) {
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE)) {
-                    return $ip;
-                }
-                if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                    return $ip;
-                }
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE)) return $ip;
+                if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
             }
         }
     }
@@ -61,12 +52,9 @@ function logRequest(): void {
         'content_type'   => $_SERVER['CONTENT_TYPE'] ?? '',
         'content_length' => isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : 0,
     ];
-
     $logFile = __DIR__ . '/../logs/access.log';
     $dir = dirname($logFile);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
     @file_put_contents($logFile, json_encode($logData, JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
 }
 

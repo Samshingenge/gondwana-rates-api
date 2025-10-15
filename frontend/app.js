@@ -1,10 +1,102 @@
 document.addEventListener('DOMContentLoaded', () => {
   // ---------- API base (robust) ----------
-  const storedApi = localStorage.getItem('API_BASE') || null;
-  const host8000 = `http://${location.hostname}:8000/api`;
-  const candidates = [storedApi, host8000, 'http://localhost:8000/api', `${location.origin}/api`].filter(Boolean);
-  let API_BASE = candidates[0] || 'http://localhost:8000/api';
+  const apiLog = (...args) => console.debug('[api-base]', ...args);
+  const pageProtocol = location.protocol;
+  const isSecurePage = pageProtocol === 'https:';
+  const isCodespacesHost = /\.app\.github\.dev$/i.test(location.hostname);
+  const storedRaw = localStorage.getItem('API_BASE') || null;
+  const codespaceMatch = isCodespacesHost
+    ? location.hostname.match(/^(.*)-(\d+)(\.app\.github\.dev)$/i)
+    : null;
+  const codespaceBase = codespaceMatch ? codespaceMatch[1] : null;
+  const codespaceDomain = codespaceMatch ? codespaceMatch[3] : null;
+  const mapCodespacePort = (port) => {
+    if (!codespaceBase || !codespaceDomain) return null;
+    return `${codespaceBase}-${port}${codespaceDomain}`;
+  };
+
+
+
+  
+
+
+  function sanitizeCandidate(base) {
+    if (!base) return null;
+    try {
+      const url = new URL(base, location.origin);
+      if (codespaceMatch && url.hostname === location.hostname && url.port === '8000') {
+        const mapped = mapCodespacePort('8000');
+        if (mapped) {
+          url.protocol = 'https:';
+          url.hostname = mapped;
+          url.port = '';
+        }
+      }
+      if (url.pathname.endsWith('/')) {
+        url.pathname = url.pathname.replace(/\/+$/, '');
+      }
+      if (isSecurePage && url.protocol !== 'https:') {
+        if (url.hostname === location.hostname) {
+          url.protocol = 'https:';
+          url.port = '';
+        } else if (codespaceMatch && /\.app\.github\.dev$/i.test(url.hostname)) {
+          url.protocol = 'https:';
+          url.port = '';
+        } else {
+          apiLog('rejecting insecure candidate on secure page', { base, hostname: url.hostname });
+          return null;
+        }
+      }
+      return url.toString();
+    } catch (err) {
+      apiLog('sanitizeCandidate error', { base, message: err?.message });
+      return null;
+    }
+  }
+
+  let storedApi = sanitizeCandidate(storedRaw);
+  if (storedRaw && !storedApi) {
+    apiLog('dropping persisted API_BASE because it is incompatible', { storedRaw, pageProtocol });
+    localStorage.removeItem('API_BASE');
+  }
+  if (storedApi && storedApi !== storedRaw) {
+    apiLog('upgrading persisted API_BASE to sanitized value', { from: storedRaw, to: storedApi });
+    localStorage.setItem('API_BASE', storedApi);
+  }
+
+  const candidateSet = new Set();
+  const addCandidate = (label, base) => {
+    const sanitized = sanitizeCandidate(base);
+    if (!sanitized) {
+      if (base) apiLog('candidate skipped', { label, base });
+      return;
+    }
+    if (!candidateSet.has(sanitized)) {
+      candidateSet.add(sanitized);
+      apiLog('candidate added', { label, sanitized });
+    }
+  };
+
+  addCandidate('localStorage', storedApi);
+
+  if (codespaceMatch) {
+    const mapped = mapCodespacePort('8000');
+    if (mapped) addCandidate('codespaces-https-8000', `https://${mapped}/api`);
+  } else {
+    const scheme = isSecurePage ? 'https' : (pageProtocol.replace(':', '') || 'http');
+    const host = location.hostname || 'localhost';
+    addCandidate('host-port-8000', `${scheme}://${host}:8000/api`);
+  }
+
+  addCandidate('localhost-default', 'http://localhost:8000/api');
+  addCandidate('same-origin', `${location.origin}/api`);
+
+  const candidates = Array.from(candidateSet);
+  let API_BASE = candidates[0]
+    || sanitizeCandidate(isSecurePage ? `${location.origin}/api` : 'http://localhost:8000/api')
+    || (isSecurePage ? `${location.origin}/api` : 'http://localhost:8000/api');
   let apiLocked = false;
+  apiLog('candidates final', { candidates, initialApiBase: API_BASE, isSecurePage, isCodespacesHost, pageProtocol });
 
   async function safeJson(res) {
     const text = await res.text();
@@ -13,27 +105,42 @@ document.addEventListener('DOMContentLoaded', () => {
     catch { return { json: null, raw: text, html: isHtml }; }
   }
   async function probe(base) {
+    const url = `${base.replace(/\/+$/, '')}/test`;
+    apiLog('probing candidate', { base, url });
     try {
-      const r = await fetch(`${base}/test`, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ ping: 'probe' }),
       });
       const { json, html } = await safeJson(r);
-      return r.ok && !html && json && typeof json === 'object';
-    } catch { return false; }
+      const ok = r.ok && !html && json && typeof json === 'object';
+      apiLog('probe result', { base, ok, status: r.status, redirected: r.redirected });
+      return ok;
+    } catch (err) {
+      apiLog('probe error', { base, message: err?.message, name: err?.name });
+      return false;
+    }
   }
   async function ensureApiBase() {
     if (apiLocked) return API_BASE;
+    apiLog('ensureApiBase start', { API_BASE, candidateCount: candidates.length });
     for (const base of candidates) {
+      if (!base) continue;
+      let protocol = 'invalid';
+      try { protocol = new URL(base).protocol; } catch {}
+      apiLog('trying candidate', { base, protocol });
       if (await probe(base)) {
         API_BASE = base;
         localStorage.setItem('API_BASE', base);
         apiLocked = true;
+        apiLog('candidate locked', { base });
         return API_BASE;
       }
+      apiLog('candidate failed', { base });
     }
     apiLocked = true;
+    apiLog('no candidate validated; using fallback', { fallback: API_BASE });
     return API_BASE;
   }
 
@@ -670,6 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       await ensureApiBase();
+      apiLog('submitForm fetch', { API_BASE, pageProtocol });
       const res = await fetch(`${API_BASE}/rates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -709,6 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearMessage();
     try {
       await ensureApiBase();
+      apiLog('testEndpoint fetch', { API_BASE, pageProtocol });
       const res = await fetch(`${API_BASE}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },

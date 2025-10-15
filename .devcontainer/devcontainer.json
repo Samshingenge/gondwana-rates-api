@@ -4,8 +4,8 @@
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "forwardPorts": [8000, 5500],
   "portsAttributes": {
-    "8000": { "label": "PHP API", "onAutoForward": "openBrowser" },
-    "5500": { "label": "Frontend", "onAutoForward": "openBrowser" }
+    "8000": { "label": "PHP API", "onAutoForward": "notify", "requireLocalPort": false, "visibility": "public" },
+    "5500": { "label": "Frontend", "onAutoForward": "notify", "requireLocalPort": false, "visibility": "public" }
   },
   "postCreateCommand": "sudo install -m 0755 /usr/local/bin/composer /usr/bin/composer || true && cd backend && composer install",
   "postStartCommand": "nohup bash -lc 'php -S 0.0.0.0:8000 -t backend/public backend/public/router.php' >/tmp/php.log 2>&1 &",

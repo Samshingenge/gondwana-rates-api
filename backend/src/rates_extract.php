@@ -1,99 +1,109 @@
 <?php
+declare(strict_types=1);
+
 /**
- * Isolated rates parsing helper
- * Single source of truth for extracting availability + rate from vendor payload.
+ * Normalize vendor response to a canonical shape:
+ * [
+ *   'rate'         => float|null,   // total stay amount (NAD)
+ *   'currency'     => string,       // default 'NAD'
+ *   'availability' => bool,
+ *   'per_night'    => float|null,   // optional convenience (NAD)
+ *   'raw'          => mixed         // original vendor body
+ * ]
+ *
+ * Handles vendor payloads like:
+ * {
+ *   "Total Charge": 130000,                    // cents
+ *   "Legs": [{
+ *      "Effective Average Daily Rate": 65000,  // cents
+ *      "Total Charge": 130000
+ *   }]
+ * }
  */
+function extract_rate_payload($vendor): array
+{
+    $out = [
+        'rate'         => null,    // total for the stay (NAD)
+        'currency'     => 'NAD',
+        'availability' => false,
+        'per_night'    => null,
+        'raw'          => $vendor,
+    ];
 
-if (!function_exists('extract_rate_payload')) {
-    function extract_rate_payload($remote): array
-    {
-        // Handle primitives
-        if (is_string($remote) || is_numeric($remote) || $remote === null) {
-            return [
-                'availability' => false,
-                'rate'         => null,
-                'currency'     => 'NAD',
-                'note'         => 'Primitive response, no rate',
-                'raw'          => $remote,
-            ];
-        }
+    // Convert vendor "cents" → NAD where values look like large integers
+    $toNad = static function ($num): float {
+        $n = (float)$num;
+        return ($n >= 1000) ? ($n / 100.0) : $n;
+    };
 
-        // Find associative candidate
-        $candidate = null;
+    if (!is_array($vendor)) {
+        // Non-JSON or unknown shape
+        return $out;
+    }
 
-        if (is_array($remote)) {
-            $isAssoc = array_keys($remote) !== range(0, count($remote) - 1);
-            if ($isAssoc) {
-                $candidate = $remote;
-            } else {
-                // find last associative element (vendor sends tokens first, object last)
-                for ($i = count($remote) - 1; $i >= 0; $i--) {
-                    if (is_array($remote[$i]) && array_keys($remote[$i]) !== range(0, count($remote[$i]) - 1)) {
-                        $candidate = $remote[$i];
-                        break;
-                    }
+    $totalNad      = null;
+    $perNightNad   = null;
+    $explicitAvail = null;
+
+    // --- Top-level totals ---
+    if (isset($vendor['Total Charge']) && is_numeric($vendor['Total Charge'])) {
+        $totalNad = $toNad($vendor['Total Charge']);
+    }
+    if (array_key_exists('available', $vendor)) {
+        $explicitAvail = (bool)$vendor['available'];
+    } elseif (array_key_exists('availability', $vendor)) {
+        $explicitAvail = (bool)$vendor['availability'];
+    }
+    if (isset($vendor['Effective Average Daily Rate']) && is_numeric($vendor['Effective Average Daily Rate'])) {
+        $perNightNad = $toNad($vendor['Effective Average Daily Rate']);
+    }
+
+    // --- Legs array: sum totals; pick a reasonable per-night (first leg ADR) ---
+    if (isset($vendor['Legs']) && is_array($vendor['Legs']) && !empty($vendor['Legs'])) {
+        $sum = 0.0;
+        foreach ($vendor['Legs'] as $leg) {
+            if (isset($leg['Total Charge']) && is_numeric($leg['Total Charge'])) {
+                $sum += $toNad($leg['Total Charge']);
+            }
+            if ($perNightNad === null
+                && isset($leg['Effective Average Daily Rate'])
+                && is_numeric($leg['Effective Average Daily Rate'])) {
+                $perNightNad = $toNad($leg['Effective Average Daily Rate']);
+            }
+            // respect explicit availability if present at leg level
+            if ($explicitAvail === null) {
+                if (array_key_exists('available', $leg)) {
+                    $explicitAvail = (bool)$leg['available'];
+                } elseif (array_key_exists('availability', $leg)) {
+                    $explicitAvail = (bool)$leg['availability'];
                 }
             }
-        } elseif (is_object($remote)) {
-            $candidate = (array) $remote;
         }
-
-        if (!$candidate) {
-            return [
-                'availability' => false,
-                'rate'         => null,
-                'currency'     => 'NAD',
-                'note'         => 'No associative rate object found',
-                'raw'          => $remote,
-            ];
+        if ($sum > 0) {
+            $totalNad = $sum;
         }
-
-        // Availability rules (robust):
-        // 1) If candidate has Error Code, use it
-        // 2) Else if candidate Total Charge > 0, available
-        // 3) Else if any Legs have Error Code == 0 or Total Charge > 0, available
-        $availability = false;
-
-        if (array_key_exists('Error Code', $candidate)) {
-            $availability = ($candidate['Error Code'] === 0 || $candidate['Error Code'] === '0');
-        }
-
-        if (!$availability && isset($candidate['Total Charge']) && is_numeric($candidate['Total Charge'])) {
-            $availability = ((int) $candidate['Total Charge'] > 0);
-        }
-
-        if (!$availability && !empty($candidate['Legs']) && is_array($candidate['Legs'])) {
-            foreach ($candidate['Legs'] as $leg) {
-                if (!is_array($leg)) continue;
-                $legOk   = (isset($leg['Error Code']) && ($leg['Error Code'] === 0 || $leg['Error Code'] === '0'));
-                $legCash = (isset($leg['Total Charge']) && is_numeric($leg['Total Charge']) && (int) $leg['Total Charge'] > 0);
-                if ($legOk || $legCash) { $availability = true; break; }
-            }
-        }
-
-        // Rate selection (minor units: cents)
-        $total = $candidate['Total Charge'] ?? null;
-        $eadr  = $candidate['Effective Average Daily Rate'] ?? null;
-
-        $rateMinor = null;
-        if (is_numeric($total))      $rateMinor = (int) $total;
-        elseif (is_numeric($eadr))   $rateMinor = (int) $eadr;
-
-        if ($rateMinor === null) {
-            return [
-                'availability' => false,
-                'rate'         => null,
-                'currency'     => 'NAD',
-                'note'         => 'No valid rate returned by remote',
-                'raw'          => $candidate,
-            ];
-        }
-
-        return [
-            'availability' => $availability,
-            'rate'         => $rateMinor / 100.0, // convert to major units
-            'currency'     => 'NAD',
-            'raw'          => $candidate,
-        ];
     }
+
+    // --- Decide availability ---
+    if ($explicitAvail !== null) {
+        $out['availability'] = $explicitAvail;
+    } else {
+        // Friendly default: any positive priced value implies availability
+        $out['availability'] = ($totalNad !== null && $totalNad > 0)
+            || ($perNightNad !== null && $perNightNad > 0);
+    }
+
+    // --- Finalize rate fields ---
+    // Prefer total stay as "rate", fallback to per-night if no total
+    if ($totalNad !== null && $totalNad > 0) {
+        $out['rate'] = $totalNad;
+    } elseif ($perNightNad !== null && $perNightNad > 0) {
+        $out['rate'] = $perNightNad;
+    }
+
+    if ($perNightNad !== null && $perNightNad > 0) {
+        $out['per_night'] = $perNightNad;
+    }
+
+    return $out;
 }

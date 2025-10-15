@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.5/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.0/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          cacheResultFile=".phpunit.result.cache"
          executionOrder="depends,defects"
@@ -21,6 +21,9 @@
     <testsuites>
         <testsuite name="Unit Tests">
             <directory suffix="Test.php">tests/</directory>
+        </testsuite>
+        <testsuite name="Security Tests">
+            <directory suffix="Test.php">tests/Security/</directory>
         </testsuite>
         <testsuite name="Feature Tests">
             <directory suffix="Test.php">tests/Feature/</directory>

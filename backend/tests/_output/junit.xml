@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/workspaces/gondwana-rates-api/backend/phpunit.xml" tests="17" assertions="57" errors="0" failures="4" skipped="0" time="0.089858">
+    <testsuite name="Unit Tests" tests="17" assertions="57" errors="0" failures="4" skipped="0" time="0.089858">
+      <testsuite name="ExampleTest" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" tests="17" assertions="57" errors="0" failures="4" skipped="0" time="0.089858">
+        <testcase name="testBasicFunctionality" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="33" class="ExampleTest" classname="ExampleTest" assertions="2" time="0.014025"/>
+        <testcase name="testDateValidation" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="39" class="ExampleTest" classname="ExampleTest" assertions="6" time="0.008644"/>
+        <testcase name="testGuestCategorization" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="52" class="ExampleTest" classname="ExampleTest" assertions="6" time="0.021239">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">ExampleTest::testGuestCategorization
+Failed asserting that two arrays are equal.
+--- Expected
++++ Actual
+@@ @@
+     'adults' =&gt; 0
+     'children' =&gt; 0
+     'total' =&gt; 0
++    'infants' =&gt; 0
+ )
+
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Constraint/Equality/IsEqual.php:71
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:2573
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:944
+/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php:65
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:1657
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:515
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php:87
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:361
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/TestRunner.php:64
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/Application.php:211</failure>
+        </testcase>
+        <testcase name="testAvailableUnits" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="68" class="ExampleTest" classname="ExampleTest" assertions="5" time="0.008087"/>
+        <testcase name="testCurrencyFormatting" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="79" class="ExampleTest" classname="ExampleTest" assertions="3" time="0.000515"/>
+        <testcase name="testNightsCalculation" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="86" class="ExampleTest" classname="ExampleTest" assertions="4" time="0.006912"/>
+        <testcase name="testInputSanitization" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="97" class="ExampleTest" classname="ExampleTest" assertions="4" time="0.000742"/>
+        <testcase name="testEmailValidation" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="112" class="ExampleTest" classname="ExampleTest" assertions="5" time="0.008072"/>
+        <testcase name="testPhoneNumberValidation" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="121" class="ExampleTest" classname="ExampleTest" assertions="1" time="0.003635">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">ExampleTest::testPhoneNumberValidation
+Failed asserting that false matches expected '+264813494846'.
+
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Constraint/Equality/IsEqual.php:71
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:2573
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:944
+/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php:124
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:1657
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:515
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php:87
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:361
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/TestRunner.php:64
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/Application.php:211</failure>
+        </testcase>
+        <testcase name="testSlugify" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="132" class="ExampleTest" classname="ExampleTest" assertions="3" time="0.000463"/>
+        <testcase name="testFileSizeFormatting" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="139" class="ExampleTest" classname="ExampleTest" assertions="1" time="0.004005">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">ExampleTest::testFileSizeFormatting
+Failed asserting that two strings are equal.
+--- Expected
++++ Actual
+@@ @@
+-'1.00 KB'
++'1 KB'
+
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Constraint/Equality/IsEqual.php:71
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:2573
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:944
+/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php:141
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:1657
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:515
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php:87
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:361
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/TestRunner.php:64
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/Application.php:211</failure>
+        </testcase>
+        <testcase name="testJsonValidation" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="146" class="ExampleTest" classname="ExampleTest" assertions="4" time="0.000475"/>
+        <testcase name="testConfigAccess" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="154" class="ExampleTest" classname="ExampleTest" assertions="2" time="0.004021"/>
+        <testcase name="testSecureTokenGeneration" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="160" class="ExampleTest" classname="ExampleTest" assertions="4" time="0.000584"/>
+        <testcase name="testTimezoneConversion" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="171" class="ExampleTest" classname="ExampleTest" assertions="2" time="0.002415"/>
+        <testcase name="testArrayMergeRecursive" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="180" class="ExampleTest" classname="ExampleTest" assertions="4" time="0.000512"/>
+        <testcase name="testMobileDeviceDetection" file="/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php" line="193" class="ExampleTest" classname="ExampleTest" assertions="1" time="0.005513">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">ExampleTest::testMobileDeviceDetection
+Failed asserting that 1 is true.
+
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Constraint/Constraint.php:105
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Constraint/Constraint.php:58
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:2573
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/Assert.php:1522
+/workspaces/gondwana-rates-api/backend/tests/ExampleTest.php:197
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:1657
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:515
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php:87
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestCase.php:361
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/Framework/TestSuite.php:369
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/TestRunner.php:64
+/workspaces/gondwana-rates-api/backend/vendor/phpunit/phpunit/src/TextUI/Application.php:211</failure>
+        </testcase>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

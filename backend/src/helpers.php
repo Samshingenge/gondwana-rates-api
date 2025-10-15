@@ -97,3 +97,67 @@ function json_response(array $payload, int $status = 200): void {
     }
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
 }
+
+// Additional helper functions for testing and core functionality
+function getAvailableUnits() {
+    return defined('UNIT_TYPE_MAPPING') && is_array(UNIT_TYPE_MAPPING) ? UNIT_TYPE_MAPPING : [
+        'Standard Unit' => -2147483637,
+        'Deluxe Unit'   => -2147483456,
+    ];
+}
+
+function formatCurrency($amount, $currency = 'NAD') {
+    if (!is_numeric($amount)) {
+        $amount = 0;
+    }
+    return number_format((float)$amount, 2) . ' ' . $currency;
+}
+
+function calculateNights($arrival, $departure) {
+    if (!$arrival || !$departure) return 1;
+
+    $a = DateTime::createFromFormat('d/m/Y', $arrival);
+    $d = DateTime::createFromFormat('d/m/Y', $departure);
+
+    if (!$a || !$d) return 1;
+    return max(1, $a->diff($d)->days);
+}
+
+function sanitizeInput($data) {
+    if (is_string($data)) {
+        return htmlspecialchars($data, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+    if (is_array($data)) {
+        return array_map('sanitizeInput', $data);
+    }
+    return $data;
+}
+
+function validateEmail($email) {
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+
+function validatePhoneNumber($phone) {
+    // Basic Namibian phone validation - return formatted number or false
+    $phone = preg_replace('/[^0-9+]/', '', $phone);
+    if (str_starts_with($phone, '0')) {
+        $phone = '+264' . substr($phone, 1);
+    }
+    return preg_match('/^\+264[0-9]{8,9}$/', $phone) ? $phone : false;
+}
+
+function formatFileSize($bytes) {
+    $units = ['B', 'KB', 'MB', 'GB'];
+    $i = 0;
+    while ($bytes >= 1024 && $i < 3) {
+        $bytes /= 1024;
+        $i++;
+    }
+    return round($bytes, 2) . ' ' . $units[$i];
+}
+
+function isMobileDevice() {
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $userAgent) ? true : false;
+}

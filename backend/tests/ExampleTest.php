@@ -15,11 +15,18 @@ class ExampleTest extends TestCase
     {
         // Ensure test environment
         $_ENV['APP_ENV'] = 'testing';
-        
+        putenv('APP_ENV=testing');
+
         // Create test log directory
         $testLogDir = __DIR__ . '/../logs/test';
         if (!is_dir($testLogDir)) {
             mkdir($testLogDir, 0755, true);
+        }
+
+        // Create cache directory for rate limiter tests
+        $cacheDir = __DIR__ . '/../cache';
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
         }
     }
 

@@ -21,15 +21,19 @@
   "autoload-dev": {
     "psr-4": { "Tests\\": "tests/" }
   },
-  "scripts": {
-    "start": "php -S localhost:8000 -t public/",
+"scripts": {
+    "start": "php -S localhost:8000 -t public/ public/router.php",
+    "serve": "php -S localhost:8000 -t public/ public/router.php 2>&1 | tee logs/server.log",
     "test": "vendor/bin/phpunit",
-    "test-coverage": "vendor/bin/phpunit --coverage-clover build/logs/clover.xml",
+    "test-coverage": "vendor/bin/phpunit --coverage-clover build/logs/clover.xml" feature/security-phase1-hardening
     "lint": "vendor/bin/phpcs --standard=PSR12 src/ public/",
     "lint-fix": "vendor/bin/php-cs-fixer fix src/ public/",
     "analyze": "vendor/bin/phpstan analyze src/ public/",
     "serve": "php -S localhost:8000 -t public/ 2>&1 | tee logs/server.log",
     "security-check": "vendor/bin/phpunit --testsuite security"
+    "lint": "vendor/bin/phpcs --standard=PSR12 src/ public/"
+
+ main
   },
   "config": {
     "optimize-autoloader": true,
@@ -40,4 +44,7 @@
   "archive": {
     "exclude": ["logs/*", "coverage/*", "*.log"]
   }
+  
+
+
 }

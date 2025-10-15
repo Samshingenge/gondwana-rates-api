@@ -98,7 +98,7 @@ cd backend
 ⚙️ Configuration
 
 Unit Types are mapped in src/config.php
-.
+.,,
 
 Remote API URL:
 https://dev.gondwana-collection.com/Web-Store/Rates/Rates.php

@@ -1,0 +1,19 @@
+Example
+ [x] Basic functionality
+ [x] Date validation
+ [ ] Guest categorization
+ [x] Available units
+ [x] Currency formatting
+ [x] Nights calculation
+ [x] Input sanitization
+ [x] Email validation
+ [ ] Phone number validation
+ [x] Slugify
+ [ ] File size formatting
+ [x] Json validation
+ [x] Config access
+ [x] Secure token generation
+ [x] Timezone conversion
+ [x] Array merge recursive
+ [ ] Mobile device detection
+

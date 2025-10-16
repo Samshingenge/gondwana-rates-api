@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+// Check if this is a server start request
+if (isset($_GET['start']) && $_GET['start'] === 'project') {
+    start_project_servers();
+    exit;
+}
+
 // Serve existing static files under backend/public directly
 $uri  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $file = __DIR__ . $uri;
@@ -64,4 +70,37 @@ function serve_frontend_file(string $file): void
     header('Content-Type: ' . ($mimeMap[$ext] ?? 'application/octet-stream'));
     header('Cache-Control: public, max-age=60');
     readfile($file);
+}
+
+function start_project_servers(): void
+{
+    // Kill any existing servers on the required ports
+    exec('lsof -ti:8000 | xargs kill -9 2>/dev/null || true');
+    exec('lsof -ti:5500 | xargs kill -9 2>/dev/null || true');
+
+    $backendDir = realpath(__DIR__ . '/../..');
+    $frontendDir = $backendDir . '/frontend';
+    $routerPath = __FILE__;
+
+    // Start backend server (this current server)
+    $backendCmd = "php -S localhost:8000 {$routerPath} > /dev/null 2>&1 &";
+
+    // Start frontend server
+    $frontendCmd = "cd {$frontendDir} && php -S localhost:5500 > /dev/null 2>&1 &";
+
+    // Execute commands
+    exec($backendCmd);
+    exec($frontendCmd);
+
+    // Return success response
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'message' => 'Project servers started successfully',
+        'servers' => [
+            'backend' => 'http://localhost:8000',
+            'frontend' => 'http://localhost:5500'
+        ]
+    ]);
 }

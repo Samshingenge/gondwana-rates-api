@@ -73,10 +73,6 @@ Serve frontend/ with PHP (recommended since PHP is already installed):
 cd frontend
 php -S localhost:5500
 
-cd backend/public && php -S localhost:8000 router.php
-curl -s "http://localhost:8000/?start=project" killed
-
-
 Open in browser:
 👉 http://localhost:5500/index.html
 
